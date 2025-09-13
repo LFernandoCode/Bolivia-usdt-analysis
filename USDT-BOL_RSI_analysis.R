@@ -14,11 +14,10 @@ library(httr)
 library(writexl)
 library(TTR)
 library(tidyverse)
-
 ##################################################################################
 #                                   CONFIGURACIÓN                                #
 ##################################################################################
-#dirección dash 
+
 res <- GET(
       url = "https://usdtbol.com/api/41j11x65l36h?callback=jQuery36009479087033522224_1744686594356&_=1744686594357",
       add_headers(
@@ -41,23 +40,22 @@ res <- GET(
 ##################################################################################
 #                                  EXTRACCIÓN DE DATOS                             #
 ##################################################################################
-
 texto <- content(res, "text")
 
-json_str <- sub("^[^(]*\\((\\{.*\\})\\);?$", "\\1", texto)  
+json_str <- sub("^[^(]*\\((\\{.*\\})\\);?$", "\\1", texto) 
 datos <- fromJSON(json_str)
 
 ##################################################################################
 #                               FORMATEO Y BASE DE DATOS                         #
 ##################################################################################
-#Para convertir al formato hora y crear base 
+#Para convertir al formato hora y crear base     
 tiempos <- datos$times
 fechas <- as.POSIXct(tiempos, origin = "1970-01-01", tz = "UTC")
-cotizacion <- datos$list
+cotización <- datos$list
 
 base <- data.frame(
       fechas=fechas,
-      cotizacion=cotizacion
+      cotización=cotización
 )
 
 #exportar como excel(cambiar la dirección)
@@ -70,41 +68,46 @@ bsh <- base %>%
       mutate(fechash=as.Date(fechas))
 maximos <- bsh %>% 
       group_by(fechash) %>% 
-      filter(cotizacion==max(cotizacion,na.rm=TRUE)) %>% 
+      slice_max(order_by = cotización, n = 1, with_ties = FALSE) %>% 
       ungroup()
 
-rsi <- RSI(maximos$cotizacion,n=14, wilder=FALSE)
-brsi <- data.frame(fecha = maximos$fechash[14:length(maximos$fechas)], rsi = rsi[14:length(rsi)])
 
-"TABLA 1" <- data.frame()
+rsi <- RSI(maximos$cotización,n=14)
+brsi <- data.frame(fecha = maximos$fechash[15:length(maximos$fechas)], rsi = rsi[15:length(rsi)])
+   
+# AJUSTE DE BASES 
+maximos <- maximos %>% 
+      rename(fecha = fechash)
+base2 <- left_join(brsi,maximos, by= "fecha")  
+
+#exportar como excel(cambiar la dirección)
+#write_xlsx(base2,"DIRECCIÓN EN LA PC/usdt.xlsx")
 
 ##################################################################################
 #                                   GRAFICOS                                   #
-##################################################################################
-#PARA GRAFICAR SOLO RSI
-plot(maximos$fechas, rsi, type = "l", col = "blue", main = "RSI (n=14)", ylab = "RSI", xlab = "", xaxt = "n")
+################################################################################## 
 
-# Añadir las etiquetas personalizadas de los meses
-axis(1, at = seq(min(maximos$fechas), max(maximos$fechas), by = "month"), 
-     labels = format(seq(min(maximos$fechas), max(maximos$fechas), by = "month"), "%b %d"), 
-     las = 2)  # "las = 2" para rotar las etiquetas
+while (dev.cur() > 1) dev.off()
 
-# Añadir las líneas de sobrecompra y sobreventa
-abline(h = 70, col = "red", lty = 2)  # Línea de sobrecompra
-abline(h = 30, col = "green", lty = 2)  # Línea de sobreventa
+#                 Grafico RSI
+ggplot(base2, aes(x = fecha, y = rsi)) +
+      geom_line(color = "#2C77BF", size = 1.2) +
+      geom_hline(yintercept = 70, linetype = "solid", color = "red") +
+      geom_hline(yintercept = 30, linetype = "solid", color = "green") +
+      labs(title = "",
+           x = "", y = "RSI") +
+      scale_x_date(date_labels = "%d-%b-%y", date_breaks = "3 weeks") +
+      theme_minimal(base_size = 14) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-# Divide la ventana en 2 filas, 1 columna
-par(mfrow = c(2, 1))
 
-# Primer gráfico: RSI
-plot(maximos$fechas, rsi, type = "l", col = "blue", main = "RSI (n=14)", 
-     ylab = "RSI", xlab = "", xaxt = "n")
-axis(1, at = seq(min(maximos$fechas), max(maximos$fechas), by = "month"), 
-     labels = format(seq(min(maximos$fechas), max(maximos$fechas), by = "month"), "%b %d"), las = 2)
-abline(h = 70, col = "red", lty = 2)
-abline(h = 30, col = "green", lty = 2)
-
-# Segundo gráfico: base
-plot(base, type = "l", main = "Bs/USDT",  ylab = "Bs", xlab = "", xaxt = "n")
-axis(1, at = seq(min(maximos$fechas), max(maximos$fechas), by = "month"), 
-     labels = format(seq(min(maximos$fechas), max(maximos$fechas), by = "month"), "%b %d"), las = 2)
+#                 Grafico cotización
+ggplot(base2, aes(x = fecha, y = cotización)) +
+      geom_line(color = "#1f77b4", size = 1.0) +
+      labs(title = "",
+           subtitle = "",
+           x = NULL, y = "Bolivianos (Bs)") +
+      scale_x_date(date_labels = "%d-%b-%y", date_breaks = "3 weeks") +
+      scale_y_continuous(breaks = scales::pretty_breaks(n = 6)) +
+      theme_minimal(base_size = 14) +   
+      theme(axis.text.x = element_text(angle = 90, hjust = 1))
