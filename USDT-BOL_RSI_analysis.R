@@ -58,9 +58,6 @@ base <- data.frame(
       cotización=cotización
 )
 
-#exportar como excel(cambiar la dirección)
-#write_xlsx(base,"DIRECCIÓN EN LA PC/usdt.xlsx") 
-
 ##################################################################################
 #                               PROCESAMIENTO DE DATOS                           #
 ##################################################################################
@@ -111,3 +108,4 @@ ggplot(base2, aes(x = fecha, y = cotización)) +
       scale_y_continuous(breaks = scales::pretty_breaks(n = 6)) +
       theme_minimal(base_size = 14) +   
       theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
